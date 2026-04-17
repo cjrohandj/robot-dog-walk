@@ -71,6 +71,10 @@ The default baseline in this repo is intentionally narrow:
 That makes the baseline easy to understand while leaving clear room for
 students to extend the command space and measure the effect with the benchmark.
 
+For the homework version, keep `stage_1` as the fixed forward-only baseline.
+Students should use `stage_2` to extend command sampling and curriculum in
+`go2_pg_env/joystick.py`, without changing the notebook entry points.
+
 ## Expected Colab workflow
 
 ### 1. Setup and environment inspection
