@@ -16,6 +16,91 @@ If you already have a cloud notebook, it should download this repo with:
 COURSE_REPO_URL = "https://github.com/WeijieLai1024/EEC289A_Robotics-Homework.git"
 ```
 
+## Important: Use your own GitHub repository in Colab
+
+This assignment runs inside Google Colab, so you should **not** treat the
+Colab runtime as permanent storage. Files under `/content/` can disappear when
+the runtime restarts, disconnects, or times out. For that reason, the first
+thing each student should do is create a personal GitHub copy of this homework:
+
+1. either fork this repository, or create a new repository based on it
+2. open the first notebook configuration cell
+3. change `COURSE_REPO_URL` so it points to **your own repository**, not the
+   course repository
+4. keep `COURSE_REPO_BRANCH = "main"` if your repository uses `main`, or update
+   that variable as well if you use a different branch name
+
+For example:
+
+```python
+COURSE_REPO_URL = "https://github.com/<your-username>/<your-homework-repo>.git"
+COURSE_REPO_BRANCH = "main"
+COURSE_REPO_DIR = Path("/content/go2_course_repo")
+```
+
+From that point on, all development should happen inside the repository cloned
+into `/content/go2_course_repo`, because that is the working copy used by the
+notebook. After the setup cell finishes, the notebook already runs:
+
+```python
+%cd /content/go2_course_repo
+```
+
+so the files you inspect and edit there are the files that will actually be
+used by `train.py`, `test_policy.py`, `generate_public_rollout.py`, and
+`public_eval.py`.
+
+### Why this matters
+
+- If you leave `COURSE_REPO_URL` pointed at the course repository, your edits
+  live only in the temporary Colab runtime and are easy to lose.
+- The notebook's `ensure_course_repo(...)` helper **does not re-clone** if
+  `/content/go2_course_repo` already exists. That means you should set your own
+  `COURSE_REPO_URL` **before** running the setup cell.
+- If you accidentally ran setup with the wrong repo URL first, the safest fix is
+  to restart the Colab runtime, update `COURSE_REPO_URL`, and rerun the
+  notebook from the top.
+
+### Recommended student workflow
+
+1. Create your own GitHub repository for the assignment.
+2. In the notebook, replace `COURSE_REPO_URL` with your repository URL.
+3. Run the setup cell so Colab clones **your** repository into
+   `/content/go2_course_repo`.
+4. Sanity-check that you are on the correct remote:
+
+```bash
+cd /content/go2_course_repo
+git remote -v
+```
+
+The output should show your own GitHub repository, not the course repository.
+
+5. Do all code changes inside `/content/go2_course_repo`.
+6. Regularly save your work back to GitHub instead of relying on Colab to keep
+   your files.
+
+The basic save cycle is:
+
+```bash
+cd /content/go2_course_repo
+git status
+git add .
+git commit -m "Describe your change"
+git push origin main
+```
+
+If you prefer to work on a feature branch, replace `main` with your branch
+name, but still push regularly. The important rule is:
+
+- replace the repo URL with your own
+- do all development in that cloned copy
+- push your changes to GitHub often
+
+In short: **Colab is a temporary execution environment, not your source-control
+system. GitHub should be the place where your homework is stored safely and can
+be reproduced later.**
+
 The notebook then needs to:
 
 1. clone pinned versions of `mujoco_playground` and `unitree_mujoco`
