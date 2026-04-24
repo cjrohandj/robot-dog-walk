@@ -84,7 +84,7 @@ def default_config() -> config_dict.ConfigDict:
                 feet_clearance=-2.0,
                 feet_height=-0.2,
                 feet_slip=-0.1,
-                feet_air_time=0.1,
+                feet_air_time=0.5,
             ),
             tracking_sigma=0.25,
             max_foot_height=0.1,
