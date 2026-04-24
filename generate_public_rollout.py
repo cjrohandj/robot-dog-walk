@@ -47,6 +47,7 @@ def parse_args() -> argparse.Namespace:
         help="Optional manual override for benchmark episode length.",
     )
     parser.add_argument("--render-first-episode", action="store_true", help="Render the first benchmark episode.")
+    parser.add_argument("--render-final-eval", action="store_true", help="Render the video for the final assignment submission.")
     parser.add_argument("--render-width", type=int, default=960, help="Rendered video width.")
     parser.add_argument("--render-height", type=int, default=540, help="Rendered video height.")
     parser.add_argument("--render-camera", type=str, default="track", help="Camera name used for MuJoCo rendering.")
