@@ -3,4 +3,5 @@ __pycache__/
 .ipynb_checkpoints/
 .venv/
 go2_pg_env/xmls/assets/
+artifacts/
 
