@@ -1,0 +1,63 @@
+{
+  "homework_name": "Homework: Sim-to-Real Quadruped Locomotion with MuJoCo Playground",
+  "robot": "Go2",
+  "environment_name": "Go2JoystickFlatTerrain",
+  "stage_name": "stage_2",
+  "checkpoint_dir": "/content/go2_course_repo/artifacts/run_baseline/best_checkpoint",
+  "num_steps": 857,
+  "metrics": {
+    "velocity_tracking_error": 0.2083047330379486,
+    "yaw_tracking_error": 0.14762721955776215,
+    "fall_rate": 1.0,
+    "energy_proxy": 47.97147750854492,
+    "foot_slip_proxy": 0.4455561637878418
+  },
+  "normalized_scores": {
+    "velocity_tracking_error": 0.6905579056058612,
+    "yaw_tracking_error": 0.8809319511055946,
+    "fall_rate": 0.0,
+    "energy_proxy": 0.0,
+    "foot_slip_proxy": 0.0
+  },
+  "course_composite_score": 0.41788165718317033,
+  "rollout_summary": {
+    "video_path": "/content/go2_course_repo/artifacts/demo_bundle/demo.mp4",
+    "rollout_npz": "/content/go2_course_repo/artifacts/demo_bundle/rollout_public_eval.npz",
+    "num_steps_simulated": 857,
+    "terminated_early": true,
+    "done_step": 857,
+    "x_distance_m": -0.29713600873947144,
+    "y_offset_m": -0.8751096725463867,
+    "final_base_height_m": 0.06814753264188766,
+    "mean_command_vx": 0.5332555770874023,
+    "mean_measured_vx": 0.4212261140346527,
+    "mean_abs_yaw_error": 0.14762721955776215,
+    "demo_segments": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.6,
+        0.2,
+        0.6
+      ],
+      [
+        0.8,
+        0.3,
+        0.8
+      ],
+      [
+        1.0,
+        0.4,
+        1.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0
+      ]
+    ]
+  }
+}
