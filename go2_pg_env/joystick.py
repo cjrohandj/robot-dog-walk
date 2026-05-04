@@ -105,7 +105,7 @@ def default_config() -> config_dict.ConfigDict:
             stage_name="stage_1",
             student_stage2_goal_min=[-1.0, -0.4, -1.0],
             student_stage2_goal_max=[1.0, 0.4, 1.0],
-            student_stage2_goal_b=[0.9, 0.25, 0.5],
+            student_stage2_goal_b=[0.9, 0.7, 0.7],
         ),
         impl="jax",
         naconmax=4 * 8192,
@@ -566,7 +566,11 @@ class Joystick(go2_base.Go2Env):
         3. increase the probability of non-zero `vy` and `yaw_rate` commands
         """
         del current_command
-        return self._cmd_min, self._cmd_max, self._cmd_b
+            return (
+        self._student_stage2_goal_min,
+        self._student_stage2_goal_max,
+        self._student_stage2_goal_b,
+    )
 
     def sample_command(self, rng: jax.Array, current_command: jax.Array) -> jax.Array:
         rng, y_rng, w_rng, z_rng = jax.random.split(rng, 4)
