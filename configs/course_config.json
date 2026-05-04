@@ -78,9 +78,9 @@
       ]
     },
     "command_keep_prob": [
-      1.0,
-      1.0,
-      1.0
+      0.2,
+      0.6,
+      0.6
     ],
     "student_stage2_goal": {
       "command_range": {
