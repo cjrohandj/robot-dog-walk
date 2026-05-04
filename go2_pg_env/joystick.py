@@ -267,6 +267,7 @@ class Joystick(go2_base.Go2Env):
         metrics["tracking/yaw_error"] = jp.zeros(())
         metrics["tracking/energy_usage"] = jp.zeros(())
         metrics["tracking/slip_rate"] = jp.zeros(())
+        metrics["tracking/fall_rate"] = jp.zeros(())
 
         obs = self._get_obs(data, info)
         reward, done = jp.zeros(2)
@@ -328,6 +329,7 @@ class Joystick(go2_base.Go2Env):
         feet_vel = data.sensordata[self._foot_linvel_sensor_adr]
         foot_slip_speed = jp.linalg.norm(feet_vel[..., :2], axis=-1) * contact
         state.metrics["tracking/slip_rate"] = jp.sum(foot_slip_speed) / jp.maximum(jp.sum(contact), 1)
+        state.metrics["tracking/fall_rate"] = done.astype(jp.float32)
 
         return state.replace(data=data, obs=obs, reward=reward, done=done.astype(reward.dtype))
 

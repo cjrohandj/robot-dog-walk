@@ -32,6 +32,14 @@ METRIC_KEYS = {
         "eval/tracking/slip_rate",
         "tracking/slip_rate",
     ),
+    "fall_rate": (
+        "eval/episode_tracking/fall_rate",
+        "eval/tracking/fall_rate",
+        "tracking/fall_rate",
+        "eval/episode_reward/termination",
+        "eval/reward/termination",
+        "reward/termination",
+    ),
 }
 
 PLOT_SPECS = (
@@ -39,6 +47,7 @@ PLOT_SPECS = (
     ("yaw_error", "Training-time yaw tracking error", "mean |cmd - meas| [rad/s]"),
     ("energy_usage", "Training-time energy usage", "mean sum |joint velocity * torque| [W]"),
     ("slip_rate", "Training-time foot slip rate", "mean contact-foot slip speed [m/s]"),
+    ("fall_rate", "Training-time fall rate", "mean falls per step"),
 )
 
 
@@ -72,17 +81,17 @@ def _load_stage_records(stage_dir: Path) -> tuple[list[int], dict[str, list[floa
     for record in _load_json(progress_path):
         metrics = record.get("metrics", {})
         values = {name: _find_metric(metrics, keys) for name, keys in METRIC_KEYS.items()}
-        if any(value is None for value in values.values()):
+        if all(value is None for value in values.values()):
             continue
         steps.append(int(record["num_steps"]))
         for name, value in values.items():
-            series[name].append(float(value))
+            series[name].append(float("nan") if value is None else float(value))
 
     if not steps:
         available = sorted(_load_json(progress_path)[-1].get("metrics", {}).keys())
         raise KeyError(
-            "No complete tracking diagnostic metrics were found. "
-            "This plot requires a run trained after tracking, energy, and slip metrics were added. "
+            "No tracking diagnostic metrics were found. "
+            "This plot requires a run trained after diagnostic metrics were added. "
             f"Last record metric keys: {available}"
         )
 
@@ -146,7 +155,7 @@ def plot_training_errors(run_dir: Path, output_png: Path) -> None:
             "the new tracking/energy/slip keys are written."
         )
 
-    fig, axes = plt.subplots(4, 1, figsize=(11, 12), sharex=False)
+    fig, axes = plt.subplots(len(PLOT_SPECS), 1, figsize=(11, 14), sharex=False)
     colors = {"stage_1": "#4c72b0", "stage_2": "#dd8452", run_dir.name: "#4c72b0"}
 
     for stage_dir in stage_dirs:
