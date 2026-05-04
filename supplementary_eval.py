@@ -7,7 +7,7 @@ Replaces multi-panel graphics with:
   (b) instantaneous yaw error over time
 
 Adds:
-  - episode boundary markers
+  - clear episode boundary markers
 
 Removed:
   - composite score panel
@@ -68,8 +68,8 @@ def run_all(bundle, save_path="minimal_eval.png"):
     t = np.arange(f["N"])
     ep_id = f["ep_id"]
 
-    # episode boundaries
-    boundaries = np.where(ep_id[1:] != ep_id[:-1])[0] + 1
+    # episode boundaries (change points)
+    boundaries = np.where(np.diff(ep_id) != 0)[0] + 1
 
     fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
 
@@ -83,12 +83,25 @@ def run_all(bundle, save_path="minimal_eval.png"):
     axes[1].plot(t, f["yaw_err"], linewidth=1.5, color="orange")
     axes[1].set_ylabel("yaw error")
     axes[1].set_title("Instantaneous yaw tracking error")
-    axes[1].set_xlabel("")
+    axes[1].set_xlabel("timestep")
 
-    # draw episode boundaries
-    for b in boundaries:
-        axes[0].axvline(b, color="white", alpha=0.15, linewidth=1)
-        axes[1].axvline(b, color="white", alpha=0.15, linewidth=1)
+    # episode boundaries (clear + visible)
+    for i, b in enumerate(boundaries):
+        label = "episode boundary" if i == 0 else None
+        for ax in axes:
+            ax.axvline(
+                b,
+                color="red",
+                linestyle="--",
+                linewidth=1.2,
+                alpha=0.6,
+                label=label
+            )
+
+    # clean duplicate legend entries
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles:
+        axes[0].legend(loc="upper right")
 
     plt.tight_layout()
 
