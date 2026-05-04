@@ -566,7 +566,7 @@ class Joystick(go2_base.Go2Env):
         3. increase the probability of non-zero `vy` and `yaw_rate` commands
         """
         del current_command
-            return (
+        return (
         self._student_stage2_goal_min,
         self._student_stage2_goal_max,
         self._student_stage2_goal_b,
