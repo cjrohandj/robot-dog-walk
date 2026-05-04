@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 
 
 METRIC_KEYS = {
@@ -43,10 +44,10 @@ METRIC_KEYS = {
 }
 
 PLOT_SPECS = (
-    ("lin_vel_error", "Training-time linear velocity tracking error", "mean ||cmd - meas|| [m/s]"),
-    ("yaw_error", "Training-time yaw tracking error", "mean |cmd - meas| [rad/s]"),
-    ("energy_usage", "Training-time energy usage", "mean sum |joint velocity * torque| [W]"),
-    ("slip_rate", "Training-time foot slip rate", "mean contact-foot slip speed [m/s]"),
+    ("lin_vel_error", "Training-time linear velocity tracking error", "per-step ||cmd - meas|| [m/s]"),
+    ("yaw_error", "Training-time yaw tracking error", "per-step |cmd - meas| [rad/s]"),
+    ("energy_usage", "Training-time energy usage", "per-step sum |joint velocity * torque| [W]"),
+    ("slip_rate", "Training-time foot slip rate", "per-step contact-foot slip speed [m/s]"),
     ("fall_rate", "Training-time fall rate", "mean falls per step"),
 )
 
@@ -68,6 +69,20 @@ def _find_metric(metrics: dict[str, Any], candidates: tuple[str, ...]) -> float 
     return None
 
 
+def _normalize_episode_metric(metric_name: str, value: float | None, metrics: dict[str, Any]) -> float | None:
+    if value is None:
+        return None
+    if metric_name == "fall_rate":
+        return value
+    episode_length = metrics.get("eval/avg_episode_length")
+    if episode_length is None:
+        return value
+    episode_length = float(episode_length)
+    if episode_length <= 0.0:
+        return value
+    return value / episode_length
+
+
 def _load_stage_records(stage_dir: Path) -> tuple[list[int], dict[str, list[float]]]:
     progress_path = stage_dir / "progress.json"
     if not progress_path.exists():
@@ -80,7 +95,10 @@ def _load_stage_records(stage_dir: Path) -> tuple[list[int], dict[str, list[floa
 
     for record in _load_json(progress_path):
         metrics = record.get("metrics", {})
-        values = {name: _find_metric(metrics, keys) for name, keys in METRIC_KEYS.items()}
+        values = {
+            name: _normalize_episode_metric(name, _find_metric(metrics, keys), metrics)
+            for name, keys in METRIC_KEYS.items()
+        }
         if all(value is None for value in values.values()):
             continue
         steps.append(int(record["num_steps"]))
@@ -145,6 +163,13 @@ def _auto_discover_run_dir(requested_run_dir: Path) -> Path:
     return discovered_run_dir
 
 
+def _stage_local_steps(steps: list[int]) -> list[int]:
+    if not steps:
+        return steps
+    first_step = steps[0]
+    return [step - first_step for step in steps]
+
+
 def plot_training_errors(run_dir: Path, output_png: Path) -> None:
     stage_dirs = _discover_stage_dirs(run_dir)
     if not stage_dirs:
@@ -157,20 +182,25 @@ def plot_training_errors(run_dir: Path, output_png: Path) -> None:
 
     fig, axes = plt.subplots(len(PLOT_SPECS), 1, figsize=(11, 14), sharex=False)
     colors = {"stage_1": "#4c72b0", "stage_2": "#dd8452", run_dir.name: "#4c72b0"}
+    max_stage_step = 0
 
     for stage_dir in stage_dirs:
         steps, series = _load_stage_records(stage_dir)
+        plot_steps = _stage_local_steps(steps)
+        max_stage_step = max(max_stage_step, max(plot_steps))
         label = stage_dir.name
         color = colors.get(label)
         for ax, (metric_name, _, _) in zip(axes, PLOT_SPECS):
-            ax.plot(steps, series[metric_name], marker="o", linewidth=1.8, label=label, color=color)
+            ax.plot(plot_steps, series[metric_name], marker="o", linewidth=1.8, label=label, color=color)
 
     for ax, (_, title, ylabel) in zip(axes, PLOT_SPECS):
         ax.set_title(title)
         ax.set_ylabel(ylabel)
+        ax.set_xlim(0, max_stage_step)
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value / 1_000_000:g}"))
         ax.grid(True, alpha=0.3)
         ax.legend()
-    axes[-1].set_xlabel("environment steps")
+    axes[-1].set_xlabel("stage-local environment steps (millions)")
 
     fig.tight_layout()
     output_png.parent.mkdir(parents=True, exist_ok=True)

@@ -191,6 +191,12 @@ def _segment_metrics(
         results.append(
             {
                 "segment": label,
+                "command_vx": float(np.mean(command_xy[mask, 0])),
+                "command_vy": float(np.mean(command_xy[mask, 1])),
+                "command_yaw_rate": float(np.mean(command_yaw[mask])),
+                "mean_measured_vx": float(np.mean(measured_xy[mask, 0])),
+                "mean_measured_vy": float(np.mean(measured_xy[mask, 1])),
+                "mean_measured_yaw_rate": float(np.mean(measured_yaw[mask])),
                 "mean_linear_velocity_error": float(np.mean(np.linalg.norm(command_xy[mask] - measured_xy[mask], axis=1))),
                 "mean_yaw_error": float(np.mean(np.abs(command_yaw[mask] - measured_yaw[mask]))),
                 "mean_vx_error": float(np.mean(np.abs(command_xy[mask, 0] - measured_xy[mask, 0]))),
