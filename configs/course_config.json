@@ -56,7 +56,11 @@
       1.0,
       0.0,
       0.0
-    ]
+    ],
+    "reward_scales": {
+      "action_rate": -0.02,
+      "energy": -0.0015
+    }
   },
   "stage_2": {
     "name": "stage_2",
