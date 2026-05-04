@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate a checkpoint on x-only, y-only, and yaw-only command segments."""
+"""Evaluate a checkpoint on isolated and combined command probes."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from test_policy import load_policy_with_workaround
 
 
 ROOT = Path(__file__).resolve().parent
-SEGMENT_LABELS = ("x only", "y only", "yaw only")
+SEGMENT_LABELS = ("x only", "y only", "yaw only", "x + yaw circle")
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,6 +58,12 @@ def parse_args() -> argparse.Namespace:
         default=0.6,
         help="Fraction of the configured safe command max to use.",
     )
+    parser.add_argument(
+        "--settling-seconds",
+        type=float,
+        default=0.75,
+        help="Seconds to ignore at the start of each probe when computing summary metrics.",
+    )
     parser.add_argument("--force-cpu", action="store_true", help="Force JAX onto CPU.")
     return parser.parse_args()
 
@@ -78,6 +84,7 @@ def _build_per_direction_commands(config: dict[str, Any], command_scale: float) 
         np.asarray([scale * vx_max, 0.0, 0.0], dtype=np.float32),
         np.asarray([0.0, scale * vy_max, 0.0], dtype=np.float32),
         np.asarray([0.0, 0.0, scale * yaw_max], dtype=np.float32),
+        np.asarray([scale * vx_max, 0.0, scale * yaw_max], dtype=np.float32),
     ]
 
 
@@ -182,25 +189,32 @@ def _segment_metrics(
     command_yaw: np.ndarray,
     measured_yaw: np.ndarray,
     segment_ids: np.ndarray,
+    settling_steps: int,
 ) -> list[dict[str, float | str]]:
     results = []
     for segment_idx, label in enumerate(SEGMENT_LABELS):
-        mask = segment_ids == segment_idx
-        if not np.any(mask):
+        segment_indices = np.flatnonzero(segment_ids == segment_idx)
+        if len(segment_indices) == 0:
             continue
+        metric_indices = segment_indices[min(int(settling_steps), len(segment_indices) - 1) :]
         results.append(
             {
                 "segment": label,
-                "command_vx": float(np.mean(command_xy[mask, 0])),
-                "command_vy": float(np.mean(command_xy[mask, 1])),
-                "command_yaw_rate": float(np.mean(command_yaw[mask])),
-                "mean_measured_vx": float(np.mean(measured_xy[mask, 0])),
-                "mean_measured_vy": float(np.mean(measured_xy[mask, 1])),
-                "mean_measured_yaw_rate": float(np.mean(measured_yaw[mask])),
-                "mean_linear_velocity_error": float(np.mean(np.linalg.norm(command_xy[mask] - measured_xy[mask], axis=1))),
-                "mean_yaw_error": float(np.mean(np.abs(command_yaw[mask] - measured_yaw[mask]))),
-                "mean_vx_error": float(np.mean(np.abs(command_xy[mask, 0] - measured_xy[mask, 0]))),
-                "mean_vy_error": float(np.mean(np.abs(command_xy[mask, 1] - measured_xy[mask, 1]))),
+                "num_samples": int(len(segment_indices)),
+                "num_metric_samples": int(len(metric_indices)),
+                "num_settling_samples_skipped": int(len(segment_indices) - len(metric_indices)),
+                "command_vx": float(np.mean(command_xy[metric_indices, 0])),
+                "command_vy": float(np.mean(command_xy[metric_indices, 1])),
+                "command_yaw_rate": float(np.mean(command_yaw[metric_indices])),
+                "mean_measured_vx": float(np.mean(measured_xy[metric_indices, 0])),
+                "mean_measured_vy": float(np.mean(measured_xy[metric_indices, 1])),
+                "mean_measured_yaw_rate": float(np.mean(measured_yaw[metric_indices])),
+                "mean_linear_velocity_error": float(
+                    np.mean(np.linalg.norm(command_xy[metric_indices] - measured_xy[metric_indices], axis=1))
+                ),
+                "mean_yaw_error": float(np.mean(np.abs(command_yaw[metric_indices] - measured_yaw[metric_indices]))),
+                "mean_vx_error": float(np.mean(np.abs(command_xy[metric_indices, 0] - measured_xy[metric_indices, 0]))),
+                "mean_vy_error": float(np.mean(np.abs(command_xy[metric_indices, 1] - measured_xy[metric_indices, 1]))),
             }
         )
     return results
@@ -236,8 +250,8 @@ def main() -> None:
 
     env = registry.load(env_name, config=env_cfg, config_overrides=build_env_overrides(config))
     segment_steps = max(1, int(round(float(args.segment_seconds) / float(env.dt))))
+    settling_steps = max(0, int(round(float(args.settling_seconds) / float(env.dt))))
     commands = _build_per_direction_commands(config, args.command_scale)
-    total_steps = segment_steps * len(commands)
 
     checkpoint_dir = _resolve_checkpoint_dir(args.checkpoint_dir, args.stage_name)
     policy = load_policy_with_workaround(checkpoint_dir, deterministic=True)
@@ -247,8 +261,6 @@ def main() -> None:
     step_fn = env.step if force_cpu else jax.jit(env.step)
 
     rng = jax.random.PRNGKey(int(config["seed"]) + 789)
-    state = reset_fn(rng)
-    state = _force_command(state, commands[0], jax)
 
     time_seconds = []
     segment_ids = []
@@ -259,28 +271,31 @@ def main() -> None:
     fell = []
 
     done_step = None
-    for step_idx in range(total_steps):
-        segment_idx = min(len(commands) - 1, step_idx // segment_steps)
-        command = commands[segment_idx]
+    global_step = 0
+    for segment_idx, command in enumerate(commands):
+        rng, reset_key = jax.random.split(rng)
+        state = reset_fn(reset_key)
         state = _force_command(state, command, jax)
 
-        rng, act_key = jax.random.split(rng)
-        action, _ = policy(state.obs, act_key)
-        state = step_fn(state, action)
-        state = _force_command(state, command, jax)
+        for _ in range(segment_steps):
+            rng, act_key = jax.random.split(rng)
+            action, _ = policy(state.obs, act_key)
+            state = step_fn(state, action)
+            state = _force_command(state, command, jax)
 
-        time_seconds.append((step_idx + 1) * float(env.dt))
-        segment_ids.append(segment_idx)
-        command_xy.append(command[:2])
-        measured_xy.append(np.asarray(env.get_local_linvel(state.data)[:2], dtype=np.float32))
-        command_yaw.append(command[2])
-        measured_yaw.append(np.asarray(env.get_gyro(state.data)[2], dtype=np.float32))
+            global_step += 1
+            time_seconds.append(global_step * float(env.dt))
+            segment_ids.append(segment_idx)
+            command_xy.append(command[:2])
+            measured_xy.append(np.asarray(env.get_local_linvel(state.data)[:2], dtype=np.float32))
+            command_yaw.append(command[2])
+            measured_yaw.append(np.asarray(env.get_gyro(state.data)[2], dtype=np.float32))
 
-        done = bool(np.asarray(state.done))
-        fell.append(done)
-        if done and done_step is None:
-            done_step = step_idx + 1
-            break
+            done = bool(np.asarray(state.done))
+            fell.append(done)
+            if done and done_step is None:
+                done_step = global_step
+                break
 
     bundle = {
         "time_seconds": np.asarray(time_seconds, dtype=np.float32),
@@ -298,6 +313,8 @@ def main() -> None:
         "stage_name": args.stage_name,
         "segment_seconds": float(args.segment_seconds),
         "segment_steps": int(segment_steps),
+        "settling_seconds": float(args.settling_seconds),
+        "settling_steps": int(settling_steps),
         "command_scale": float(args.command_scale),
         "commands": [command.tolist() for command in commands],
         "segment_labels": list(SEGMENT_LABELS),
@@ -312,6 +329,7 @@ def main() -> None:
             bundle["command_yaw_rate"],
             bundle["measured_yaw_rate"],
             bundle["segment_id"],
+            settling_steps,
         ),
     }
 
