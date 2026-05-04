@@ -105,6 +105,37 @@ def _discover_stage_dirs(run_dir: Path) -> list[Path]:
     return discovered
 
 
+def _auto_discover_run_dir(requested_run_dir: Path) -> Path:
+    """Find a real training run when the default output path was not used."""
+    if _discover_stage_dirs(requested_run_dir):
+        return requested_run_dir
+
+    artifacts_dir = requested_run_dir.parent
+    if not artifacts_dir.is_dir():
+        return requested_run_dir
+
+    candidates = []
+    for candidate in artifacts_dir.iterdir():
+        if not candidate.is_dir():
+            continue
+        stage_dirs = _discover_stage_dirs(candidate)
+        if not stage_dirs:
+            continue
+        newest_progress_time = max(
+            max((stage_dir / name).stat().st_mtime for name in ("progress.json", "progress_live.json") if (stage_dir / name).exists())
+            for stage_dir in stage_dirs
+        )
+        candidates.append((newest_progress_time, candidate))
+
+    if not candidates:
+        return requested_run_dir
+
+    candidates.sort(key=lambda item: item[0])
+    discovered_run_dir = candidates[-1][1]
+    print(f"Using discovered training run: {discovered_run_dir}")
+    return discovered_run_dir
+
+
 def plot_training_errors(run_dir: Path, output_png: Path) -> None:
     stage_dirs = _discover_stage_dirs(run_dir)
     if not stage_dirs:
@@ -154,7 +185,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    run_dir = args.run_dir.resolve()
+    run_dir = _auto_discover_run_dir(args.run_dir.resolve())
     output_png = args.output_png.resolve() if args.output_png else run_dir / "training_diagnostics.png"
     plot_training_errors(run_dir, output_png)
 
