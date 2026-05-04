@@ -589,47 +589,9 @@ class Joystick(go2_base.Go2Env):
     )
 
     def sample_command(self, rng: jax.Array, current_command: jax.Array) -> jax.Array:
-        if self._command_stage_name == "stage_2":
-            return self._sample_stage2_command(rng)
-
         rng, y_rng, w_rng, z_rng = jax.random.split(rng, 4)
         cmd_min, cmd_max, cmd_keep_prob = self._command_sampling_profile(current_command)
         candidate = jax.random.uniform(y_rng, shape=(3,), minval=cmd_min, maxval=cmd_max)
         active_mask = jax.random.bernoulli(z_rng, cmd_keep_prob, shape=(3,))
         blend_mask = jax.random.bernoulli(w_rng, 0.5, shape=(3,))
         return current_command - blend_mask * (current_command - candidate * active_mask)
-
-    def _sample_stage2_command(self, rng: jax.Array) -> jax.Array:
-        cmd_min, cmd_max, _ = self._student_stage2_sampling_profile(jp.zeros(3))
-        rng, candidate_rng, mode_rng = jax.random.split(rng, 3)
-        candidate = jax.random.uniform(candidate_rng, shape=(3,), minval=cmd_min, maxval=cmd_max)
-
-        # Explicit modes make pure lateral, pure yaw, and negative commands
-        # common enough to learn during stage 2.
-        mode = jax.random.categorical(
-            mode_rng,
-            jp.log(jp.array([0.05, 0.08, 0.10, 0.08, 0.12, 0.08, 0.10, 0.10, 0.09, 0.05, 0.15])),
-        )
-        masks = jp.array(
-            [
-                [0.0, 0.0, 0.0],  # stand
-                [1.0, 0.0, 0.0],  # x only, either sign
-                [1.0, 0.0, 0.0],  # -x only
-                [0.0, 1.0, 0.0],  # y only, either sign
-                [0.0, 1.0, 0.0],  # -y only
-                [0.0, 0.0, 1.0],  # yaw only, either sign
-                [0.0, 0.0, 1.0],  # -yaw only
-                [1.0, 0.0, 1.0],  # x + yaw, either sign
-                [1.0, 1.0, 1.0],  # x + y + yaw, mixed signs
-                [1.0, 1.0, 1.0],  # +x +y +yaw
-                [1.0, 1.0, 1.0],  # -x -y -yaw
-            ]
-        )
-        command = candidate * masks[mode]
-        negative_axis = -jp.abs(candidate) * masks[mode]
-        positive_combo = jp.abs(candidate)
-        negative_combo = -jp.abs(candidate)
-        command = jp.where((mode == 2) | (mode == 4) | (mode == 6), negative_axis, command)
-        command = jp.where(mode == 9, positive_combo, command)
-        command = jp.where(mode == 10, negative_combo, command)
-        return jp.clip(command, cmd_min, cmd_max)
