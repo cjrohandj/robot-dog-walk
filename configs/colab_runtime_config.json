@@ -85,20 +85,20 @@
     "student_stage2_goal": {
       "command_range": {
         "min": [
-          -0.6,
-          -0.2,
-          -0.6
+          0.0,
+          -0.4,
+          -1.0
         ],
         "max": [
-          0.6,
-          0.2,
-          0.6
+          1.0,
+          0.4,
+          1.0
         ]
       },
       "command_keep_prob": [
         1.0,
-        0.35,
-        0.35
+        0.7,
+        0.7
       ]
     },
     "reward_scales": {
