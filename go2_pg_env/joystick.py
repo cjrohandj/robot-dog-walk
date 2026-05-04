@@ -263,6 +263,10 @@ class Joystick(go2_base.Go2Env):
 
         metrics = {f"reward/{name}": jp.zeros(()) for name in self._config.reward_config.scales.keys()}
         metrics["swing_peak"] = jp.zeros(())
+        metrics["tracking/lin_vel_error"] = jp.zeros(())
+        metrics["tracking/yaw_error"] = jp.zeros(())
+        metrics["tracking/energy_usage"] = jp.zeros(())
+        metrics["tracking/slip_rate"] = jp.zeros(())
 
         obs = self._get_obs(data, info)
         reward, done = jp.zeros(2)
@@ -288,8 +292,9 @@ class Joystick(go2_base.Go2Env):
         obs = self._get_obs(data, state.info)
         done = self._get_termination(data)
 
-        rewards = self._get_reward(data, action, state.info, state.metrics, done, first_contact, contact)
-        rewards = {key: value * self._config.reward_config.scales[key] for key, value in rewards.items()}
+        command = state.info["command"]
+        raw_rewards = self._get_reward(data, action, state.info, state.metrics, done, first_contact, contact)
+        rewards = {key: value * self._config.reward_config.scales[key] for key, value in raw_rewards.items()}
         reward = jp.clip(sum(rewards.values()) * self.dt, 0.0, 10000.0)
 
         state.info["last_last_act"] = state.info["last_act"]
@@ -314,6 +319,15 @@ class Joystick(go2_base.Go2Env):
         for key, value in rewards.items():
             state.metrics[f"reward/{key}"] = value
         state.metrics["swing_peak"] = jp.mean(state.info["swing_peak"])
+        state.metrics["tracking/lin_vel_error"] = jp.linalg.norm(
+            command[:2] - self.get_local_linvel(data)[:2]
+        )
+        state.metrics["tracking/yaw_error"] = jp.abs(command[2] - self.get_gyro(data)[2])
+        state.metrics["tracking/energy_usage"] = raw_rewards["energy"]
+
+        feet_vel = data.sensordata[self._foot_linvel_sensor_adr]
+        foot_slip_speed = jp.linalg.norm(feet_vel[..., :2], axis=-1) * contact
+        state.metrics["tracking/slip_rate"] = jp.sum(foot_slip_speed) / jp.maximum(jp.sum(contact), 1)
 
         return state.replace(data=data, obs=obs, reward=reward, done=done.astype(reward.dtype))
 
