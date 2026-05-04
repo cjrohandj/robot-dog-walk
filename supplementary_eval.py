@@ -6,10 +6,11 @@ Replaces multi-panel graphics with:
   (a) instantaneous linear velocity error over time
   (b) instantaneous yaw error over time
 
+Adds:
+  - episode boundary markers
+
 Removed:
   - composite score panel
-
-Designed for simple debugging + reporting.
 """
 
 from __future__ import annotations
@@ -49,13 +50,13 @@ def extract(bundle):
     if meas_lin.ndim == 1:
         meas_lin = meas_lin.reshape(-1, 2)
 
-    # instantaneous errors
     lin_err = np.linalg.norm(cmd_lin - meas_lin, axis=1)
     yaw_err = np.abs(cmd_yaw - meas_yaw)
 
     return dict(
         lin_err=lin_err,
         yaw_err=yaw_err,
+        ep_id=ep_id,
         N=N,
     )
 
@@ -65,6 +66,10 @@ def run_all(bundle, save_path="minimal_eval.png"):
     f = extract(bundle)
 
     t = np.arange(f["N"])
+    ep_id = f["ep_id"]
+
+    # episode boundaries
+    boundaries = np.where(ep_id[1:] != ep_id[:-1])[0] + 1
 
     fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
 
@@ -78,7 +83,12 @@ def run_all(bundle, save_path="minimal_eval.png"):
     axes[1].plot(t, f["yaw_err"], linewidth=1.5, color="orange")
     axes[1].set_ylabel("yaw error")
     axes[1].set_title("Instantaneous yaw tracking error")
-    axes[1].set_xlabel("timestep")
+    axes[1].set_xlabel("")
+
+    # draw episode boundaries
+    for b in boundaries:
+        axes[0].axvline(b, color="white", alpha=0.15, linewidth=1)
+        axes[1].axvline(b, color="white", alpha=0.15, linewidth=1)
 
     plt.tight_layout()
 
