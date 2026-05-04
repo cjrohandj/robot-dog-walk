@@ -89,10 +89,31 @@ def _load_stage_records(stage_dir: Path) -> tuple[list[int], dict[str, list[floa
     return steps, series
 
 
+def _has_progress_log(path: Path) -> bool:
+    return (path / "progress.json").exists() or (path / "progress_live.json").exists()
+
+
+def _discover_stage_dirs(run_dir: Path) -> list[Path]:
+    if _has_progress_log(run_dir):
+        return [run_dir]
+
+    stage_dirs = [path for path in (run_dir / "stage_1", run_dir / "stage_2") if _has_progress_log(path)]
+    if stage_dirs:
+        return stage_dirs
+
+    discovered = sorted({path.parent for path in run_dir.rglob("progress*.json")})
+    return discovered
+
+
 def plot_training_errors(run_dir: Path, output_png: Path) -> None:
-    stage_dirs = [path for path in (run_dir / "stage_1", run_dir / "stage_2") if path.is_dir()]
+    stage_dirs = _discover_stage_dirs(run_dir)
     if not stage_dirs:
-        stage_dirs = [run_dir]
+        raise FileNotFoundError(
+            f"No progress.json or progress_live.json found under {run_dir}. "
+            "Run training first, or pass --run-dir to the actual output directory, for example "
+            "--run-dir artifacts/YOUR_RUN_NAME. If you trained before adding these metrics, retrain so "
+            "the new tracking/energy/slip keys are written."
+        )
 
     fig, axes = plt.subplots(4, 1, figsize=(11, 12), sharex=False)
     colors = {"stage_1": "#4c72b0", "stage_2": "#dd8452", run_dir.name: "#4c72b0"}

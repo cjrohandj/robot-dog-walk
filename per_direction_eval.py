@@ -81,6 +81,54 @@ def _build_per_direction_commands(config: dict[str, Any], command_scale: float) 
     ]
 
 
+def _looks_like_checkpoint(path: Path) -> bool:
+    return (path / "ppo_network_config.json").is_file()
+
+
+def _resolve_checkpoint_dir(path: Path, stage_name: str) -> Path:
+    path = path.resolve()
+    if _looks_like_checkpoint(path):
+        return path
+
+    candidates = [
+        path / "best_checkpoint",
+        path / stage_name / "best_checkpoint",
+        path / stage_name / "checkpoints",
+        path / "checkpoints",
+    ]
+
+    for candidate in candidates[:2]:
+        if _looks_like_checkpoint(candidate):
+            return candidate
+
+    for checkpoint_root in candidates[2:]:
+        if not checkpoint_root.is_dir():
+            continue
+        numbered = []
+        for child in checkpoint_root.iterdir():
+            if not child.is_dir() or not _looks_like_checkpoint(child):
+                continue
+            try:
+                numbered.append((int(child.name), child))
+            except ValueError:
+                continue
+        if numbered:
+            numbered.sort(key=lambda item: item[0])
+            return numbered[-1][1]
+
+    discovered = sorted(path.rglob("ppo_network_config.json"))
+    if discovered:
+        preferred = [item for item in discovered if "best_checkpoint" in item.parts]
+        return (preferred[0] if preferred else discovered[-1]).parent
+
+    raise FileNotFoundError(
+        f"No PPO checkpoint found under {path}. "
+        "Pass --checkpoint-dir to a directory that contains ppo_network_config.json, or pass the training "
+        "run directory after training has produced checkpoints. Common examples: "
+        "artifacts/YOUR_RUN_NAME/best_checkpoint or artifacts/YOUR_RUN_NAME/stage_2/checkpoints/000000123456."
+    )
+
+
 def _plot_rollout(bundle: dict[str, np.ndarray], summary: dict[str, Any], output_png: Path) -> None:
     time = bundle["time_seconds"]
     command_xy = bundle["command_lin_vel_xy"]
@@ -185,7 +233,8 @@ def main() -> None:
     commands = _build_per_direction_commands(config, args.command_scale)
     total_steps = segment_steps * len(commands)
 
-    policy = load_policy_with_workaround(args.checkpoint_dir.resolve(), deterministic=True)
+    checkpoint_dir = _resolve_checkpoint_dir(args.checkpoint_dir, args.stage_name)
+    policy = load_policy_with_workaround(checkpoint_dir, deterministic=True)
     if not force_cpu:
         policy = jax.jit(policy)
     reset_fn = env.reset if force_cpu else jax.jit(env.reset)
@@ -238,7 +287,8 @@ def main() -> None:
     }
 
     summary = {
-        "checkpoint_dir": str(args.checkpoint_dir.resolve()),
+        "checkpoint_dir": str(checkpoint_dir),
+        "checkpoint_request": str(args.checkpoint_dir.resolve()),
         "stage_name": args.stage_name,
         "segment_seconds": float(args.segment_seconds),
         "segment_steps": int(segment_steps),
