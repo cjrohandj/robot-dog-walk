@@ -604,18 +604,21 @@ class Joystick(go2_base.Go2Env):
         rng, candidate_rng, mode_rng = jax.random.split(rng, 3)
         candidate = jax.random.uniform(candidate_rng, shape=(3,), minval=cmd_min, maxval=cmd_max)
 
-        # Explicit modes make pure lateral, pure yaw, and negative combined
-        # commands common enough to learn during stage 2.
+        # Explicit modes make pure lateral, pure yaw, and negative commands
+        # common enough to learn during stage 2.
         mode = jax.random.categorical(
             mode_rng,
-            jp.log(jp.array([0.06, 0.15, 0.17, 0.17, 0.15, 0.14, 0.08, 0.08])),
+            jp.log(jp.array([0.05, 0.08, 0.10, 0.08, 0.12, 0.08, 0.10, 0.10, 0.09, 0.05, 0.15])),
         )
         masks = jp.array(
             [
                 [0.0, 0.0, 0.0],  # stand
                 [1.0, 0.0, 0.0],  # x only, either sign
+                [1.0, 0.0, 0.0],  # -x only
                 [0.0, 1.0, 0.0],  # y only, either sign
+                [0.0, 1.0, 0.0],  # -y only
                 [0.0, 0.0, 1.0],  # yaw only, either sign
+                [0.0, 0.0, 1.0],  # -yaw only
                 [1.0, 0.0, 1.0],  # x + yaw, either sign
                 [1.0, 1.0, 1.0],  # x + y + yaw, mixed signs
                 [1.0, 1.0, 1.0],  # +x +y +yaw
@@ -623,8 +626,10 @@ class Joystick(go2_base.Go2Env):
             ]
         )
         command = candidate * masks[mode]
+        negative_axis = -jp.abs(candidate) * masks[mode]
         positive_combo = jp.abs(candidate)
         negative_combo = -jp.abs(candidate)
-        command = jp.where(mode == 6, positive_combo, command)
-        command = jp.where(mode == 7, negative_combo, command)
+        command = jp.where((mode == 2) | (mode == 4) | (mode == 6), negative_axis, command)
+        command = jp.where(mode == 9, positive_combo, command)
+        command = jp.where(mode == 10, negative_combo, command)
         return jp.clip(command, cmd_min, cmd_max)

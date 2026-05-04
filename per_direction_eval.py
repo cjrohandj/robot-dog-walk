@@ -27,7 +27,7 @@ from test_policy import load_policy_with_workaround
 
 
 ROOT = Path(__file__).resolve().parent
-SEGMENT_LABELS = ("x only", "y only", "yaw only", "x + yaw circle", "x + y + yaw")
+SEGMENT_LABELS = ("x only", "y only", "yaw only", "x + yaw circle", "y + yaw", "x + y + yaw")
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,6 +88,7 @@ def _build_per_direction_commands(config: dict[str, Any], command_scale: float) 
         np.asarray([0.0, scale * vy_max, 0.0], dtype=np.float32),
         np.asarray([0.0, 0.0, scale * yaw_max], dtype=np.float32),
         np.asarray([scale * vx_max, 0.0, scale * yaw_max], dtype=np.float32),
+        np.asarray([0.0, scale * vy_max, scale * yaw_max], dtype=np.float32),
         np.asarray([scale * vx_max, scale * vy_max, scale * yaw_max], dtype=np.float32),
     ]
 
