@@ -111,6 +111,140 @@ def _safe_float(value: Any) -> float:
     return float(np.asarray(value).item())
 
 
+def _mean_or_zero(values: np.ndarray) -> float:
+    if values.size == 0:
+        return 0.0
+    return float(np.mean(values))
+
+
+def compute_demo_tracking_eval(
+    command_xy: np.ndarray,
+    measured_xy: np.ndarray,
+    command_yaw: np.ndarray,
+    measured_yaw: np.ndarray,
+    demo_segments: list[list[float]],
+    total_steps: int,
+) -> dict[str, Any]:
+    """Summarize how closely the demo rollout follows each scripted command."""
+    num_samples = int(command_yaw.shape[0])
+    if num_samples == 0:
+        return {
+            "num_samples": 0,
+            "overall": {},
+            "segments": [],
+        }
+
+    error_xy = measured_xy - command_xy
+    error_yaw = measured_yaw - command_yaw
+    lin_error_norm = np.linalg.norm(error_xy, axis=-1)
+
+    overall = {
+        "mean_linear_velocity_error": _mean_or_zero(lin_error_norm),
+        "rmse_linear_velocity_error": float(np.sqrt(np.mean(np.square(lin_error_norm)))),
+        "mean_abs_vx_error": _mean_or_zero(np.abs(error_xy[:, 0])),
+        "mean_abs_vy_error": _mean_or_zero(np.abs(error_xy[:, 1])),
+        "mean_abs_yaw_error": _mean_or_zero(np.abs(error_yaw)),
+        "rmse_yaw_error": float(np.sqrt(np.mean(np.square(error_yaw)))),
+        "mean_command_speed": _mean_or_zero(np.linalg.norm(command_xy, axis=-1)),
+        "mean_measured_speed": _mean_or_zero(np.linalg.norm(measured_xy, axis=-1)),
+    }
+
+    segment_length = max(1, total_steps // len(demo_segments))
+    segment_summaries: list[dict[str, Any]] = []
+    for segment_idx, segment in enumerate(demo_segments):
+        start = segment_idx * segment_length
+        end = total_steps if segment_idx == len(demo_segments) - 1 else min(total_steps, start + segment_length)
+        start = min(start, num_samples)
+        end = min(end, num_samples)
+        if end <= start:
+            continue
+
+        mask = slice(start, end)
+        segment_error_xy = error_xy[mask]
+        segment_error_yaw = error_yaw[mask]
+        segment_lin_error = np.linalg.norm(segment_error_xy, axis=-1)
+        segment_summaries.append(
+            {
+                "segment_index": int(segment_idx),
+                "start_step": int(start),
+                "end_step": int(end),
+                "num_steps": int(end - start),
+                "command": [float(value) for value in segment],
+                "mean_measured_vx": _mean_or_zero(measured_xy[mask, 0]),
+                "mean_measured_vy": _mean_or_zero(measured_xy[mask, 1]),
+                "mean_measured_yaw_rate": _mean_or_zero(measured_yaw[mask]),
+                "mean_linear_velocity_error": _mean_or_zero(segment_lin_error),
+                "mean_abs_vx_error": _mean_or_zero(np.abs(segment_error_xy[:, 0])),
+                "mean_abs_vy_error": _mean_or_zero(np.abs(segment_error_xy[:, 1])),
+                "mean_abs_yaw_error": _mean_or_zero(np.abs(segment_error_yaw)),
+            }
+        )
+
+    return {
+        "num_samples": num_samples,
+        "overall": overall,
+        "segments": segment_summaries,
+    }
+
+
+def plot_demo_tracking_eval(
+    command_xy: np.ndarray,
+    measured_xy: np.ndarray,
+    command_yaw: np.ndarray,
+    measured_yaw: np.ndarray,
+    demo_segments: list[list[float]],
+    total_steps: int,
+    ctrl_dt: float,
+    output_png: Path,
+) -> None:
+    """Render a compact visual check of command tracking during the demo."""
+    import matplotlib.pyplot as plt
+
+    num_samples = int(command_yaw.shape[0])
+    if command_xy.ndim == 1:
+        command_xy = command_xy.reshape((num_samples, 2))
+    if measured_xy.ndim == 1:
+        measured_xy = measured_xy.reshape((num_samples, 2))
+
+    time = np.arange(num_samples, dtype=np.float32) * float(ctrl_dt)
+    lin_error = np.linalg.norm(command_xy - measured_xy, axis=-1) if num_samples else np.asarray([])
+    yaw_error = np.abs(command_yaw - measured_yaw) if num_samples else np.asarray([])
+
+    fig, axes = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
+
+    axes[0].plot(time, command_xy[:, 0], color="#4c72b0", linestyle="--", label="cmd vx")
+    axes[0].plot(time, measured_xy[:, 0], color="#4c72b0", label="measured vx")
+    axes[0].set_ylabel("vx [m/s]")
+
+    axes[1].plot(time, command_xy[:, 1], color="#55a868", linestyle="--", label="cmd vy")
+    axes[1].plot(time, measured_xy[:, 1], color="#55a868", label="measured vy")
+    axes[1].set_ylabel("vy [m/s]")
+
+    axes[2].plot(time, command_yaw, color="#dd8452", linestyle="--", label="cmd yaw")
+    axes[2].plot(time, measured_yaw, color="#dd8452", label="measured yaw")
+    axes[2].set_ylabel("yaw rate [rad/s]")
+
+    axes[3].plot(time, lin_error, color="#4c72b0", label="linear velocity error")
+    axes[3].plot(time, yaw_error, color="#dd8452", label="yaw error")
+    axes[3].set_ylabel("error")
+    axes[3].set_xlabel("time [s]")
+
+    segment_length = max(1, total_steps // len(demo_segments))
+    boundary_steps = [idx * segment_length for idx in range(1, len(demo_segments))]
+    for ax in axes:
+        for boundary_step in boundary_steps:
+            boundary_time = float(boundary_step) * float(ctrl_dt)
+            ax.axvline(boundary_time, color="black", linestyle=":", linewidth=1.1, alpha=0.65)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="upper right")
+
+    fig.suptitle("Demo command tracking")
+    fig.tight_layout()
+    output_png.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_png, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main() -> None:
     args = parse_args()
     config = load_json(args.config)
@@ -228,6 +362,7 @@ def main() -> None:
     np.savez(
         rollout_npz,
         episode_id=np.zeros(num_samples, dtype=np.int32),
+        time_seconds=np.arange(num_samples, dtype=np.float32) * float(env.dt),
         command_lin_vel_xy=np.asarray(command_xy, dtype=np.float32),
         measured_lin_vel_xy=np.asarray(measured_xy, dtype=np.float32),
         command_yaw_rate=np.asarray(command_yaw, dtype=np.float32),
@@ -238,20 +373,48 @@ def main() -> None:
         foot_slip_speed=np.asarray(foot_slip_speed, dtype=np.float32),
     )
 
+    command_xy_array = np.asarray(command_xy, dtype=np.float32)
+    measured_xy_array = np.asarray(measured_xy, dtype=np.float32)
+    command_yaw_array = np.asarray(command_yaw, dtype=np.float32)
+    measured_yaw_array = np.asarray(measured_yaw, dtype=np.float32)
+    demo_tracking_eval = compute_demo_tracking_eval(
+        command_xy_array,
+        measured_xy_array,
+        command_yaw_array,
+        measured_yaw_array,
+        demo_segments,
+        total_steps,
+    )
+    save_json(output_dir / "demo_tracking_eval.json", clean_json_value(demo_tracking_eval))
+    demo_tracking_png = output_dir / "demo_tracking_eval.png"
+    plot_demo_tracking_eval(
+        command_xy_array,
+        measured_xy_array,
+        command_yaw_array,
+        measured_yaw_array,
+        demo_segments,
+        total_steps,
+        float(env.dt),
+        demo_tracking_png,
+    )
+
     final_state = trajectory[-1]
     rollout_summary = {
         "video_path": str(video_path),
         "rollout_npz": str(rollout_npz),
+        "demo_tracking_eval_json": str(output_dir / "demo_tracking_eval.json"),
+        "demo_tracking_eval_png": str(demo_tracking_png),
         "num_steps_simulated": num_samples,
         "terminated_early": done_step is not None,
         "done_step": done_step,
         "x_distance_m": _safe_float(final_state.data.qpos[0] - start_x),
         "y_offset_m": _safe_float(final_state.data.qpos[1] - start_y),
         "final_base_height_m": _safe_float(final_state.data.qpos[2]),
-        "mean_command_vx": float(np.mean(np.asarray(command_xy)[:, 0])) if num_samples else 0.0,
-        "mean_measured_vx": float(np.mean(np.asarray(measured_xy)[:, 0])) if num_samples else 0.0,
-        "mean_abs_yaw_error": float(np.mean(np.abs(np.asarray(command_yaw) - np.asarray(measured_yaw)))) if num_samples else 0.0,
+        "mean_command_vx": float(np.mean(command_xy_array[:, 0])) if num_samples else 0.0,
+        "mean_measured_vx": float(np.mean(measured_xy_array[:, 0])) if num_samples else 0.0,
+        "mean_abs_yaw_error": demo_tracking_eval["overall"].get("mean_abs_yaw_error", 0.0),
         "demo_segments": demo_segments,
+        "demo_tracking_eval": demo_tracking_eval,
     }
     save_json(output_dir / "demo_summary.json", rollout_summary)
 
@@ -270,6 +433,7 @@ def main() -> None:
             "metrics": metrics,
             "normalized_scores": normalized_scores,
             "course_composite_score": composite_score,
+            "demo_tracking_eval": demo_tracking_eval,
             "rollout_summary": rollout_summary,
         }
     )

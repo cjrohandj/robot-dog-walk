@@ -139,7 +139,7 @@ go2_pg_env/
 scripts/copy_go2_assets.py         Copy Go2 meshes from unitree_mujoco into this repo layout
 
 train.py                           Two-stage PPO training
-test_policy.py                     Restore a checkpoint and render a deterministic demo
+test_policy.py                     Restore a checkpoint, render a demo, and write demo_tracking_eval JSON/PNG
 generate_public_rollout.py         Generate the standardized public benchmark rollout
 public_eval.py                     Score a rollout bundle
 inspect_env.py                     Print a compact environment summary
