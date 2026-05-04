@@ -189,13 +189,13 @@
       },
       "energy_proxy": {
         "direction": "lower_better",
-        "weight": 0.15,
+        "weight": 0.1,
         "good": 8.0,
         "bad": 40.0
       },
       "foot_slip_proxy": {
         "direction": "lower_better",
-        "weight": 0.1,
+        "weight": 0.15,
         "good": 0.02,
         "bad": 0.2
       }
