@@ -132,7 +132,7 @@ def extract(bundle):
     yaw_err    = np.abs(cmd_yaw - meas_yaw)
     energy     = np.abs(torq * jvel).sum(axis=1) if (torq is not None and jvel is not None) else None
     if slip is not None:
-    slip = np.asarray(slip)
+        slip = np.asarray(slip)
     if slip.ndim == 2:
         # aggregate per timestep (choose one)
         slip = slip.mean(axis=1)      # average slip across feet (recommended)
