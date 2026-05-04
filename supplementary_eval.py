@@ -3,10 +3,11 @@
 supplementary_eval_minimal.py
 Minimal evaluation plot for Go2 locomotion policy.
 Replaces multi-panel graphics with:
-  (a) linear error over time
-  (b) yaw error over time
-  (c) composite score:
-      1 - mean( sqrt( sum_t (direction_tracking_error^2 per episode) ) )
+  (a) instantaneous linear velocity error over time
+  (b) instantaneous yaw error over time
+
+Removed:
+  - composite score panel
 
 Designed for simple debugging + reporting.
 """
@@ -48,38 +49,15 @@ def extract(bundle):
     if meas_lin.ndim == 1:
         meas_lin = meas_lin.reshape(-1, 2)
 
+    # instantaneous errors
     lin_err = np.linalg.norm(cmd_lin - meas_lin, axis=1)
     yaw_err = np.abs(cmd_yaw - meas_yaw)
 
     return dict(
         lin_err=lin_err,
         yaw_err=yaw_err,
-        ep_id=ep_id,
-        cmd_lin=cmd_lin,
         N=N,
     )
-
-# ── composite score ────────────────────────────────────────────────────────────
-
-def composite_score(f):
-    ep_ids = np.unique(f["ep_id"])
-    ep_vals = []
-
-    for e in ep_ids:
-        mask = f["ep_id"] == e
-        cmd = f["cmd_lin"][mask]
-
-        # direction tracking error per step
-        err = np.linalg.norm(cmd, axis=1)
-
-        ep_vals.append(np.sqrt(np.sum(err ** 2)))
-
-    ep_vals = np.array(ep_vals)
-
-    if len(ep_vals) == 0:
-        return 0.0
-
-    return 1.0 - float(np.mean(ep_vals))
 
 # ── plotting ───────────────────────────────────────────────────────────────────
 
@@ -88,24 +66,19 @@ def run_all(bundle, save_path="minimal_eval.png"):
 
     t = np.arange(f["N"])
 
-    fig, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
 
-    # (a) linear error over time
+    # (a) instantaneous linear velocity error
     axes[0].plot(t, f["lin_err"], linewidth=1.5)
-    axes[0].set_ylabel("linear error")
-    axes[0].set_title("Linear tracking error over time")
+    axes[0].set_ylabel("linear velocity error")
+    axes[0].set_title("Instantaneous linear velocity tracking error")
+    axes[0].set_xlabel("timestep")
 
-    # (b) yaw error over time
+    # (b) instantaneous yaw error
     axes[1].plot(t, f["yaw_err"], linewidth=1.5, color="orange")
     axes[1].set_ylabel("yaw error")
-    axes[1].set_title("Yaw tracking error over time")
-
-    # (c) composite score
-    score = composite_score(f)
-    axes[2].bar([0], [score])
-    axes[2].set_ylim(0, 1)
-    axes[2].set_title(f"Composite score: {score:.4f}")
-    axes[2].set_xticks([])
+    axes[1].set_title("Instantaneous yaw tracking error")
+    axes[1].set_xlabel("timestep")
 
     plt.tight_layout()
 
