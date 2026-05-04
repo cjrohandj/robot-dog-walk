@@ -82,7 +82,7 @@ def default_config() -> config_dict.ConfigDict:
                 energy=-0.001,
                 # Foot-behavior terms
                 feet_clearance=-2.0,
-                feet_height=-0.2,
+                feet_height=-0.1,
                 feet_slip=-0.1,
                 feet_air_time=0.1,
             ),
