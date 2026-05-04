@@ -100,12 +100,12 @@ def default_config() -> config_dict.ConfigDict:
             min=[-1.0, -0.4, -1.0],
             max=[1.0, 0.4, 1.0],
             # Probability that each command channel stays active
-            b=[0.9, 0.25, 0.5],
+            b=[0.2, 0.6, 0.6],
             # Stage metadata is injected from configs/course_config.json.
             stage_name="stage_1",
             student_stage2_goal_min=[-1.0, -0.4, -1.0],
             student_stage2_goal_max=[1.0, 0.4, 1.0],
-            student_stage2_goal_b=[0.9, 0.7, 0.7],
+            student_stage2_goal_b=[0.2, 0.6, 0.6],
         ),
         impl="jax",
         naconmax=4 * 8192,
