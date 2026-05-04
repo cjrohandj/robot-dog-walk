@@ -69,8 +69,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def _force_command(state: Any, command: np.ndarray, jax: Any) -> Any:
-    state.info["command"] = jax.numpy.asarray(command, dtype=jax.numpy.float32)
+    command_array = jax.numpy.asarray(command, dtype=jax.numpy.float32)
+    state.info["command"] = command_array
     state.info["steps_until_next_cmd"] = np.int32(10**9)
+    if isinstance(state.obs, dict) and "state" in state.obs:
+        state.obs["state"] = state.obs["state"].at[-3:].set(command_array)
     return state
 
 
@@ -221,6 +224,30 @@ def _segment_metrics(
     return results
 
 
+def _segment_command_ranges(
+    command_xy: np.ndarray,
+    command_yaw: np.ndarray,
+    segment_ids: np.ndarray,
+) -> list[dict[str, float | str]]:
+    ranges = []
+    for segment_idx, label in enumerate(SEGMENT_LABELS):
+        mask = segment_ids == segment_idx
+        if not np.any(mask):
+            continue
+        ranges.append(
+            {
+                "segment": label,
+                "command_vx_min": float(np.min(command_xy[mask, 0])),
+                "command_vx_max": float(np.max(command_xy[mask, 0])),
+                "command_vy_min": float(np.min(command_xy[mask, 1])),
+                "command_vy_max": float(np.max(command_xy[mask, 1])),
+                "command_yaw_rate_min": float(np.min(command_yaw[mask])),
+                "command_yaw_rate_max": float(np.max(command_yaw[mask])),
+            }
+        )
+    return ranges
+
+
 def main() -> None:
     args = parse_args()
     config = load_json(args.config)
@@ -324,6 +351,11 @@ def main() -> None:
         "num_steps_simulated": int(len(bundle["time_seconds"])),
         "terminated_early": done_step is not None,
         "done_step": done_step,
+        "recorded_command_ranges": _segment_command_ranges(
+            bundle["command_lin_vel_xy"],
+            bundle["command_yaw_rate"],
+            bundle["segment_id"],
+        ),
         "segment_metrics": _segment_metrics(
             bundle["command_lin_vel_xy"],
             bundle["measured_lin_vel_xy"],
