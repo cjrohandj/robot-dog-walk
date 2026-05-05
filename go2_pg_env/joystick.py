@@ -73,7 +73,7 @@ def default_config() -> config_dict.ConfigDict:
                 ang_vel_xy=-0.05,
                 orientation=-5.0,
                 dof_pos_limits=-1.0,
-                pose=0.2,
+                pose=0.4,
                 termination=-1.0,
                 stand_still=-1.0,
                 # Smoothness / efficiency terms
