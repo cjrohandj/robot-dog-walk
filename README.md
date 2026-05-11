@@ -2,7 +2,7 @@ This is a homework assignment for EEC289A - set up the curriculum for a robot do
 
 Demonstration video:
 
-<video src = "awesome_bot-1.mp4" width="320" height="240" controls></video>
+<video src = "awesome_dog.mp4" width="320" height="240" controls></video>
 
 
 Some analysis:
