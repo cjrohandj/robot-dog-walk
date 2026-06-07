@@ -42,7 +42,7 @@
     "num_timesteps": 10000000,
     "command_range": {
       "min": [
-        0.0,
+        0.1,
         0.0,
         0.0
       ],
@@ -67,14 +67,14 @@
     "num_timesteps": 20000000,
     "command_range": {
       "min": [
-        -1.0,
-        -0.4,
-        -1.0
+        0.1,
+        0.1,
+        0.1
       ],
       "max": [
-        1.0,
-        0.4,
-        1.0
+        2.0,
+        0.8,
+        2.0
       ]
     },
     "command_keep_prob": [
@@ -85,14 +85,14 @@
     "student_stage2_goal": {
       "command_range": {
         "min": [
-          -1.0,
-          -0.4,
-          -1.0
+          0.1,
+          0.1,
+          0.1
         ],
         "max": [
-          1.0,
-          0.4,
-          1.0
+          2.0,
+          0.8,
+          2.0
         ]
       },
       "command_keep_prob": [
@@ -102,8 +102,8 @@
       ]
     },
     "reward_scales": {
-      "action_rate": -0.01,
-      "energy": -0.001
+      "action_rate": 0.0,
+      "energy": 0.0
     },
     "restore_previous_stage_checkpoint": true
   },
@@ -111,92 +111,47 @@
     "segment_seconds": 5.0,
     "segments": [
       [
-        0.0,
-        0.0,
-        0.0
+        0.1,
+        0.1,
+        0.1
       ],
       [
         0.2,
-        0.0,
-        0.0
+        0.1,
+        0.2
       ],
       [
-        -0.3,
-        0.0,
-        0.0
-      ],
-      [
-        0.0,
-        0.3,
-        0.0
-      ],
-      [
-        0.0,
-        -0.4,
-        0.0
-      ],
-      [
-        0.0,
-        0.0,
-        0.6
-      ],
-      [
-        0.6,
+        0.5,
         0.2,
-        0.6
+        0.5
       ],
       [
-        0.8,
-        0.3,
-        0.8
+        2.0,
+        0.5,
+        2.0
       ],
-      [
-        1.0,
-        0.4,
-        1.0
-      ],
-      [
-        -0.6,
-        -0.2,
-        -0.6
-      ],
-      [
-        -0.8,
-        -0.3,
-        -0.8
-      ],
-      [
-        -0.1,
-        -0.4,
-        -0.1
-      ],
-      [
-        0.0,
-        0.0,
-        0.0
-      ]
-    ]
+          ]
   },
   "public_eval": {
     "episode_length_seconds": 30.0,
     "safe_command_ranges": {
       "vx": [
-        -0.6,
-        0.6
+        0.1,
+        2.0
       ],
       "vy": [
-        -0.2,
-        0.2
+        0.0,
+        2.0
       ],
       "yaw": [
-        -0.6,
-        0.6
+        0.0,
+        2.0
       ]
     },
     "metrics": {
       "velocity_tracking_error": {
         "direction": "lower_better",
-        "weight": 0.35,
+        "weight": 0.45,
         "good": 0.1,
         "bad": 0.45
       },
@@ -214,7 +169,7 @@
       },
       "energy_proxy": {
         "direction": "lower_better",
-        "weight": 0.1,
+        "weight": 0.0,
         "good": 8.0,
         "bad": 40.0
       },
